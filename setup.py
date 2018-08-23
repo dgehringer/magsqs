@@ -14,7 +14,7 @@ setup(
     entry_points={
         'console_scripts': ['magsqs=magsqs:main']
     },
-    install_requires = [
+    install_requires=[
         'pymatgen',
         'sympy',
         'numpy',

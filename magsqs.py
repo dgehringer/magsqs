@@ -22,6 +22,7 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 from fractions import Fraction
+
 __doc__ = """
 Generator for disordered non-collinear magentic momentum vector
 
@@ -79,7 +80,7 @@ Note:
 PREC_DEFAULT = 3
 DEFAULT_SUFFIX = '_MAG_SQS'
 
-#Take care of environment variables
+# Take care of environment variables
 if 'MAG_SQS_PREC' in os.environ:
     try:
         PREC = int(os.environ['MAG_SQS_PREC'])
@@ -92,7 +93,6 @@ if 'MAG_SQS_SUFFIX' in os.environ:
     OUTPUT_SUFFIX = os.environ['MAG_SQS_SUFFIX']
 else:
     OUTPUT_SUFFIX = DEFAULT_SUFFIX
-
 
 
 class Arrow3D(FancyArrowPatch):
@@ -130,6 +130,7 @@ def star(f):
     :param f: the function to wrap
     :return: function wrapper of f
     """
+
     @functools.wraps(f)
     def f_inner(args):
         return f(*args)
@@ -150,13 +151,14 @@ def map_structure(s, predicate=lambda k: True, apply=lambda k: k):
     assert isinstance(s, Structure)
     return [apply(site) for site in s.sites if predicate(site)]
 
-#Utility function to generate a random float between to borders
+
+# Utility function to generate a random float between to borders
 rand_between = lambda a, b: max([a, b]) - abs(b - a) * random()
 
-#Utility function to remove whitespace from a string
+# Utility function to remove whitespace from a string
 remove_whitespace = lambda fstr: fstr.replace(' ', '').replace('\n', '').replace('\t', '')
 
-#Utility function to create a format wildcard with certain precision
+# Utility function to create a format wildcard with certain precision
 make_format_crumb = lambda i: '{' + str(int(i)) + ':.' + str(int(PREC)) + 'f}'
 
 
@@ -224,8 +226,10 @@ def random_normal_vector(vec):
     d_args = (d_min, d_max) if -2 * a ** 2 - 2 * b ** 2 - 2 * c ** 2 < 0 else (d_max, abs(d_max) + d_max)
     d = rand_between(*d_args)
     e, f = (
-    (-a * b * d + c * sqrt(-a ** 2 * d ** 2 - b ** 2 * d ** 2 + b ** 2 - c ** 2 * d ** 2 + c ** 2)) / (b ** 2 + c ** 2),
-    -(a * c * d + b * sqrt(-a ** 2 * d ** 2 - b ** 2 * d ** 2 + b ** 2 - c ** 2 * d ** 2 + c ** 2)) / (b ** 2 + c ** 2))
+        (-a * b * d + c * sqrt(-a ** 2 * d ** 2 - b ** 2 * d ** 2 + b ** 2 - c ** 2 * d ** 2 + c ** 2)) / (
+                b ** 2 + c ** 2),
+        -(a * c * d + b * sqrt(-a ** 2 * d ** 2 - b ** 2 * d ** 2 + b ** 2 - c ** 2 * d ** 2 + c ** 2)) / (
+                b ** 2 + c ** 2))
     result = np.array([d, e, f])
     assert np.isclose(np.linalg.norm(result), 1.0)
     assert np.isclose(np.dot(vec, result), 0)
@@ -242,42 +246,42 @@ def generate_spins_vecs_ncl(structure, lengths):
     """
     sum_vec = np.zeros((3,))
     objective = float('inf')
-    #Start with the species which has the shortest length, to ensure the residuum vector can vanish in the end
+    # Start with the species which has the shortest length, to ensure the residuum vector can vanish in the end
     lengths = OrderedDict(sorted([(k, v) for k, v in lengths.items()], key=star(lambda k, v: v)))
 
-    #Species with the longest vector. Keep it for the end
+    # Species with the longest vector. Keep it for the end
     last_species = [k for k, _ in lengths.items()][-1]
     last_species_length = lengths[last_species]
-    #Calculate objective functions
+    # Calculate objective functions
     obj = lambda v, o: abs(np.linalg.norm(v) - o)
     magmoms = {k: [] for k, _ in lengths.items()}
     for spec, length in lengths.items():
         number_of_atoms = len(map_structure(structure, predicate=lambda s: s.specie.symbol == spec))
 
-        #If its the last species leave 2 moments, to make the residuum vector vanish
+        # If its the last species leave 2 moments, to make the residuum vector vanish
         if spec == last_species:
             number_of_atoms -= 2
 
         for _ in range(number_of_atoms):
-            #Make a initial guess for the magnetic moment
+            # Make a initial guess for the magnetic moment
             current_magmom = unit_vector(np.random.uniform(-1, 1, (3,))) * length
-            #Keep it if it already reduces the residuum vector
+            # Keep it if it already reduces the residuum vector
             if obj(current_magmom + sum_vec, last_species_length) > objective:
-                #Find a random vector with negative inner product
+                # Find a random vector with negative inner product
                 current_magmom = vector_with_projection(sum_vec) * length
             sum_vec += current_magmom
             objective = obj(sum_vec, last_species_length)
             magmoms[spec].append(current_magmom)
 
-    #Make the residuum vector disappear
+    # Make the residuum vector disappear
     residuum_length = np.linalg.norm(sum_vec)
-    #Angle between random normal vector an the two remaining moments, in the place defined by cross(sum_vec, rand_norm_vec)
+    # Angle between random normal vector an the two remaining moments, in the place defined by cross(sum_vec, rand_norm_vec)
     triangle_angle = np.arcsin(residuum_length / (2.0 * last_species_length))
-    #Calculate the height of the triangle
+    # Calculate the height of the triangle
     r = last_species_length * np.cos(triangle_angle)
 
     center = r * random_normal_vector(-sum_vec)
-    #Compute the remaining magnetic moments
+    # Compute the remaining magnetic moments
     residuum_vec_1, residuum_vec_2 = center - sum_vec / 2.0, - center - sum_vec / 2.0
     sum_vec += residuum_vec_1
     sum_vec += residuum_vec_2
@@ -303,34 +307,36 @@ def generate_spins_vecs_cl(structure, species, direction=np.array([1, 0, 0]), ba
     """
     magmoms = {}
     no_solution = False
-    #Make a list of species, their length and asssign a sympy symbol
+    # Make a list of species, their length and asssign a sympy symbol
     remaining_atoms = {spec: (
-    length, len(map_structure(structure, predicate=lambda s: s.specie.symbol == spec)), symbols('x{0}'.format(i)))
-                       for i, (spec, length) in enumerate(species.items())}
+        length, len(map_structure(structure, predicate=lambda s: s.specie.symbol == spec)), symbols('x{0}'.format(i)))
+        for i, (spec, length) in enumerate(species.items())}
 
-    #Utility functions to find the specie which corresponds to symbol
+    # Utility functions to find the specie which corresponds to symbol
     find_specie = lambda symbl: [spec for spec, (l, rma, sym) in remaining_atoms.items() if sym.name == symbl.name][0]
-    #Utility function to find how many atoms are occupied by the species which corresponds to the symbol symbol
-    find_remaining_atoms = lambda symbl: [rma for spec, (l, rma, sym) in remaining_atoms.items() if sym.name == symbl.name][0]
+    # Utility function to find how many atoms are occupied by the species which corresponds to the symbol symbol
+    find_remaining_atoms = lambda symbl: \
+    [rma for spec, (l, rma, sym) in remaining_atoms.items() if sym.name == symbl.name][0]
 
     if not balanced:
-        #Imbalanced version, check if all length have integer value
+        # Imbalanced version, check if all length have integer value
         if not all([float(l_).is_integer() for l_, rma_, sym_ in remaining_atoms.values()]):
             print('INFO: Not all spins have integer values. Trying to find number.')
-            #Wrap to moment lengths to fractions
-            fractions = [(Fraction(l_).limit_denominator(10**PREC), sym_) for l_, rma_, sym_ in remaining_atoms.values()]
-            numerator, denominator = 11,1
-            #Find common denominator
-            for f_ , sym_ in fractions:
+            # Wrap to moment lengths to fractions
+            fractions = [(Fraction(l_).limit_denominator(10 ** PREC), sym_) for l_, rma_, sym_ in
+                         remaining_atoms.values()]
+            numerator, denominator = 11, 1
+            # Find common denominator
+            for f_, sym_ in fractions:
                 numerator *= f_.numerator
                 denominator *= f_.denominator
-            #Remap the coefficients to integer values
+            # Remap the coefficients to integer values
             coeffs = [(l_ * denominator, sym_) for l_, rma_, sym_ in remaining_atoms.values()]
             assert all([c_.is_integer() for c_, sym_ in coeffs])
         else:
             coeffs = [(l_, sym_) for l_, rma_, sym_ in remaining_atoms.values()]
             denominator = 1
-        #Build diophantine equations
+        # Build diophantine equations
         eq = sum([c_ * sym_ for c_, sym_ in coeffs])
 
         solution = diophantine(eq)
@@ -339,48 +345,50 @@ def generate_spins_vecs_cl(structure, species, direction=np.array([1, 0, 0]), ba
 
         # Unpack solution
         solution = [(sol, symbols('x{0}'.format(i))) for i, sol in enumerate(next(iter(solution)))]
-        #Find depending variables
+        # Find depending variables
         dependent_variables = set([s for expr, _ in solution for s in expr.free_symbols])
-        #Find all permutations of small solutions with t != 0 with lentgh equal to the number of depndent variables
+        # Find all permutations of small solutions with t != 0 with lentgh equal to the number of depndent variables
         sets = [dict(zip(dependent_variables, tset)) for tset in allp([-1, 1, 2, -2], len(dependent_variables))]
         # find minimum solution
-        #Remap solutions and evaluate them for each parameter set
+        # Remap solutions and evaluate them for each parameter set
         results = [(i, tdict, [(find_specie(sym_),
                                 find_remaining_atoms(sym_),
                                 int(sol_.subs(tdict).evalf()),
                                 find_remaining_atoms(sym_) > abs(int(sol_.subs(tdict).evalf())) and
-                                (find_remaining_atoms(sym_) - abs(int(sol_.subs(tdict).evalf()))) % 2 == 0 , sym_)
+                                (find_remaining_atoms(sym_) - abs(int(sol_.subs(tdict).evalf()))) % 2 == 0, sym_)
                                for sol_, sym_ in solution]) for i, tdict in enumerate(sets)]
-        #Find all solutions which can balanced
-        results = [(i, tdict, set_) for i, (_, tdict, set_) in enumerate(results) if all([valid for _, _, _, valid, _ in set_])]
+        # Find all solutions which can balanced
+        results = [(i, tdict, set_) for i, (_, tdict, set_) in enumerate(results) if
+                   all([valid for _, _, _, valid, _ in set_])]
         if len(results) == 0 or no_solution:
             print('WARNING: No appropriate diophantine solution found. Checking if atoms can be balanced')
             min_set = [(spec_, ram_, 0, True, sym_) for spec_, (l_, ram_, sym_) in remaining_atoms.items()]
-            if not all([ ram_ %2 == 0 for _, ram_, _, _, _ in min_set]):
-                raise ValueError('Could not find diophantine solution. Also balanced mode ist not possible. Try a bigger supercell')
+            if not all([ram_ % 2 == 0 for _, ram_, _, _, _ in min_set]):
+                raise ValueError(
+                    'Could not find diophantine solution. Also balanced mode ist not possible. Try a bigger supercell')
             else:
                 print('INFO: Resuming in balanced mode')
         else:
-        # Find minmal solution where max(rma - sol_i)
+            # Find minmal solution where max(rma - sol_i)
             min_index, min_params, min_set, _ = max(
                 [(i, tdict, tset, functools.reduce(lambda x, y: x * y, [abs(n_) for spec_, rma_, n_, _, sym_ in tset]))
                  for i, tdict, tset in results], key=star(lambda i, td, s, pd: pd))
     else:
-        #Balanced mode
+        # Balanced mode
         min_set = [(spec_, ram_, 0, True, sym_) for spec_, (l_, ram_, sym_) in remaining_atoms.items()]
         if not all([ram_ % 2 == 0 for _, ram_, _, _, _ in min_set]):
             raise ValueError('Balanced mode ist not possible. Try a bigger supercell')
 
-    #Build magnetic moments
+    # Build magnetic moments
     for spec, atoms, diff, _, _ in min_set:
         balanced_spins = int((atoms - abs(diff)) / 2.0)
-        spins = [1, -1] * balanced_spins + [int(np.sign(diff))]*abs(diff)
+        spins = [1, -1] * balanced_spins + [int(np.sign(diff))] * abs(diff)
         shuffle(spins)
-        l, _ , sym = remaining_atoms[spec]
-        magmoms[spec] = [l*s*direction for s in spins]
+        l, _, sym = remaining_atoms[spec]
+        magmoms[spec] = [l * s * direction for s in spins]
         remaining_atoms[spec] = (l, 0, sym)
 
-    #Add zero vector for each atom of the unmagnetic species
+    # Add zero vector for each atom of the unmagnetic species
     remaining_species = [s for s, (_, rma_, _) in remaining_atoms.items() if rma_ > 0]
     if len(remaining_species) > 0:
         for spec in remaining_species:
@@ -398,7 +406,9 @@ def generate_spins_vecs_fm(structure, lengths, direction=np.array([1, 0, 0])):
     :param direction: the direction of the spins
     :return: a dictionary of the for {'Ni': [m1, m2, m3], 'Co' : [m4, m5, m6] } where m_i are arrays of shape (3,)
     """
-    magmoms = {spec_ : [direction*l_ for _ in range(len(map_structure(structure, predicate=lambda s: s.specie.symbol==spec_)))] for spec_, l_ in lengths.items()}
+    magmoms = {
+    spec_: [direction * l_ for _ in range(len(map_structure(structure, predicate=lambda s: s.specie.symbol == spec_)))]
+    for spec_, l_ in lengths.items()}
     return magmoms
 
 
@@ -543,7 +553,7 @@ def main():
         else:
             balanced = True
         magmoms = generate_spins_vecs_cl(structure, lengths, direction=cl_direction, balanced=balanced)
-        #Check if net magnetic moment is really zero
+        # Check if net magnetic moment is really zero
         sum_vec = np.array([array for _, v in magmoms.items() for array in v])
         assert np.isclose(np.sum(sum_vec, axis=0), np.zeros((3,))).all()
 
@@ -555,35 +565,38 @@ def main():
     magmom_str = []
     magmoms_site_property = {'magmom': []}
     for spec, magm in magmoms.items():
-        #Assemble the species list and the fractional coords in the same order as the generated magnetic moments
+        # Assemble the species list and the fractional coords in the same order as the generated magnetic moments
         current_frac_coords = map_structure(structure,
                                             predicate=lambda site: site.specie.symbol == spec,
                                             apply=lambda site: site.frac_coords)
         species_list.extend([spec] * len(current_frac_coords))
         frac_coords_list.extend(current_frac_coords)
-        #If direction is given calculate the projection of the moment onto the direction which gives length and
-        #orientation
+        # If direction is given calculate the projection of the moment onto the direction which gives length and
+        # orientation
         if options['direction'] or options['ncl']:
             magmom_str.extend(
-                [' '.join([make_format_crumb(i) for i in range(3)]).format(mag_x, mag_y, mag_z) for mag_x, mag_y, mag_z in
+                [' '.join([make_format_crumb(i) for i in range(3)]).format(mag_x, mag_y, mag_z) for mag_x, mag_y, mag_z
+                 in
                  magm])
 
             magmoms_site_property['magmom'].extend([mag_x, mag_y, mag_z] for mag_x, mag_y, mag_z in magm)
         else:
-            magmom_str.extend([ make_format_crumb(0).format(np.dot(cl_direction, np.array([mag_x, mag_y, mag_z]))) for mag_x, mag_y, mag_z in magm])
-            magmoms_site_property['magmom'].extend([np.dot(cl_direction, np.array([mag_x, mag_y, mag_z])) for mag_x, mag_y, mag_z in magm])
+            magmom_str.extend([make_format_crumb(0).format(np.dot(cl_direction, np.array([mag_x, mag_y, mag_z]))) for
+                               mag_x, mag_y, mag_z in magm])
+            magmoms_site_property['magmom'].extend(
+                [np.dot(cl_direction, np.array([mag_x, mag_y, mag_z])) for mag_x, mag_y, mag_z in magm])
 
-    #Create the new structure
+    # Create the new structure
     new_structure = Structure(structure.lattice, species_list, frac_coords_list, site_properties=magmoms_site_property)
     magmom_str = '  '.join(magmom_str)
 
-    #Write the new Posar file
+    # Write the new Posar file
     Poscar(new_structure).write_file(file_exists('{0}{1}'.format(poscar_path, OUTPUT_SUFFIX)))
     if options['--incar']:
         incar['MAGMOM'] = magmom_str
         incar.write_file(file_exists('INCAR{0}'.format(OUTPUT_SUFFIX)))
     else:
-        #Print the magnetic moment vector to the terminal
+        # Print the magnetic moment vector to the terminal
         print('MAGMOM = {0}'.format(magmom_str))
 
     if options['--plot']:
@@ -592,6 +605,7 @@ def main():
     if options['--cif']:
         cif_writer = CifWriter(new_structure, write_magmoms=True)
         cif_writer.write_file(file_exists('{0}{1}.cif'.format(poscar_path, OUTPUT_SUFFIX)))
+
 
 if __name__ == '__main__':
     main()
